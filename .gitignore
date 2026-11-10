@@ -1,0 +1,61 @@
+# ==========================================
+# ModelSim / QuestaSim (Simulación HDL)
+# ==========================================
+work/
+msim/
+*.wlf
+vsim.wlf
+transcript
+*.mpf
+*.mti
+*.vstf
+_info
+_vti
+vmsim.log
+*.cov
+*.sdb
+
+# ==========================================
+# Intel Quartus Prime / DE10-Lite (Síntesis)
+# ==========================================
+db/
+incremental_db/
+output_files/
+hc_db/
+*.qws
+*.qdf
+*.rpt
+*.done
+*.summary
+*.jdi
+*.pin
+*.sof
+*.pof
+*.qmsg
+*.smsg
+*.alt
+*.sopc_builder
+
+# ==========================================
+# Python (Decodificador Ensamblador)
+# ==========================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.hex
+*.bin
+
+# ==========================================
+# IDEs & Sistema Operativo
+# ==========================================
+.vscode/
+.idea/
+*.bak
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
