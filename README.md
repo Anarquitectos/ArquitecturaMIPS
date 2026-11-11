@@ -16,3 +16,22 @@ Proyecto de arquitectura de computadoras para la implementación de un microproc
 ├── assembler/      # Decodificador de Ensamblador a Binario en Python (.py)
 ├── quartus/        # Proyecto de Intel Quartus Prime para la tarjeta DE10-Lite
 └── README.md
+```
+
+## Simulacion de instrucciones tipo R
+
+El banco de pruebas `tb/type_r_monocycle_tb.v` ejecuta `add`, `sub`, `and`,
+`or` y `slt`. ModelSim debe iniciarse desde la raiz del proyecto para que
+encuentre `instrucciones.txt` y `registersData.txt`.
+
+```text
+vlog -work work src\datapath\*.v src\control\*.v src\processor_top.v tb\type_r_monocycle_tb.v
+vsim -c -lib work type_r_monocycle_tb -do "run -all; quit -f"
+```
+
+Para abrir las señales de la ALU en el Wave de ModelSim:
+
+```text
+vsim -lib work type_r_monocycle_tb
+do {tb\type_r_wave.do}
+```
