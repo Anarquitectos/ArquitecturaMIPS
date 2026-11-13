@@ -46,8 +46,8 @@ ROM instruction_memory(
 
 
 // Control Unit
-wire regDst, aluSrc, memToReg, regWrite, memRead, memWrite, branch;
-wire [1:0] aluOp;
+wire regDst, aluSrc, memToReg, regWrite, memRead, memWrite, branch, extOp;
+wire [2:0] aluOp;
 
 CONTROL_UNIT control_unit(
     .opcode(instruction[31:26]),
@@ -58,7 +58,8 @@ CONTROL_UNIT control_unit(
     .ALUOp(aluOp),
     .MemWrite(memWrite),
     .ALUSrc(aluSrc),
-    .RegWrite(regWrite)
+    .RegWrite(regWrite),
+    .ExtOp(extOp)
 );
 
 
@@ -80,15 +81,24 @@ wire [31:0] read_data1, read_data2;
 wire [31:0] write_back_data;
 
 REG_BANK register_bank(
+    .clk(clk),
     .ReadReg1(instruction[25:21]), // rs
     .ReadReg2(instruction[20:16]), // rt
-    .WrReg(write_reg),
-    .WrData(write_back_data),
-    .regWrite(regWrite),
+    .WrReg(write_reg), // destino elegido
+    .WrData(write_back_data), // dato final de la alu o ram
+    .regWrite(regWrite), // tal vez poner & ~ reset, para que no escriba cuando haya reset, pero no se
     .ReadData1(read_data1),
     .ReadData2(read_data2)
 );
 
+// Inmediato de 16 bits -> 32 bits Sign Extend
+wire [31:0] sign_ext;
+
+SIGN_EXT sign_extend(
+    .bin16(instruction[15:0]), // Los 16 bits de la instruccion
+    .opExt(extOp), // 1 = signo, 0 = ceros
+    .bin32(sign_ext)
+);
 
 // ALU Control Unit
 wire [3:0] alu_control_signal;
@@ -106,7 +116,7 @@ wire [31:0] alu_input_b;
 MUX alu_input_mux(
     .sel(aluSrc),
     .A(read_data2), // Register data
-    .B(32'd0), // TODO: Connect to the immediate value (for I-type instructions)
+    .B(sign_ext), // TODO: Connect to the immediate value (for I-type instructions)
     .S(alu_input_b)
 );
 
@@ -117,8 +127,8 @@ wire alu_zero_flag;
 
 ALU alu(
     .ALUctl(alu_control_signal),
-    .A(read_data1),
-    .B(alu_input_b), // TODO: Connect to the second operand (could be immediate value for I-type)
+    .A(read_data1), // siempre rs
+    .B(alu_input_b), // TODO: Connect to the second operand (could be immediate value for I-type), puede ser rt o inmediato
     .ALUOut(alu_result),
     .Zero(alu_zero_flag)
 );
@@ -135,12 +145,22 @@ MUX pc_mux(
     .S(pc_in)
 );
 
+// RAM
+wire [31:0] mem_read_data; // dato leido de la ram
+
+RAM data_memory(
+    .clk(clk),
+    .DirL(alu_result[7:2]), // direccion en bytes / 4 = indice de palabra
+    .we(memWrite), // tal vez poner & ~ reset, para que no escriba cuando haya reset, pero no se
+    .DataIn(read_data2), // sw guarda el valor de rt
+    .DataOut(mem_read_data)
+);
 
 // MUX for selecting the data to write back to the register bank (from ALU or memory)
 MUX write_data_mux(
     .sel(memToReg),
     .A(alu_result), // Data from ALU
-    .B(32'd0), // TODO: Connect to data read from memory
+    .B(mem_read_data), // TODO: Connect to data read from memory
     .S(write_back_data)
 );
 

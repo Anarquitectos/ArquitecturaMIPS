@@ -70,6 +70,6 @@ module type_r_monocycle_tb;
         else
             $display("FAIL: %0d type-R checks failed.", errors);
 
-        $finish;
+        $stop;
     end
 endmodule
