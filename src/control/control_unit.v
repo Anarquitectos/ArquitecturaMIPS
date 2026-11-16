@@ -9,7 +9,8 @@ module CONTROL_UNIT (
     output reg MemWrite,    // memory write enable
     output reg ALUSrc,      // alu source select
     output reg RegWrite,    // bank register write enable
-    output reg ExtOp
+    output reg ExtOp,
+    output reg Jump         // instruccion para indicar salto incondicional
 );
 
 always @* begin
@@ -23,6 +24,7 @@ always @* begin
     ALUSrc    = 0;
     RegWrite  = 0;
     ExtOp     = 1;
+    Jump      = 0;
     case(opcode)
         6'b000000: begin        // R-type instructions
             RegDst   <= 1;
@@ -122,6 +124,11 @@ always @* begin
             ALUOp = 3'b111; 
             ExtOp = 0; 
         end
+
+    // tipo J
+        6'b000010: begin
+           Jump = 1; //no se necesita regWrite ni memWrite y tampoco activar el branch 
+        end   
 
     endcase
 end
