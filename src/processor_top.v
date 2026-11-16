@@ -28,10 +28,11 @@ ADDER pc_adder(
 
 // Adder to calculate the branch offset
 wire [31:0] branch_offset; // This will hold the branch offset value
+wire [31:0] branch_shift_out; //offset del branch ya multiplicado por 4
 
 ADDER branch_adder(
     .A(pc_incremented),
-    .B(32'd0), // TODO: Implement branch offset calculation
+    .B(branch_shift_out), // PC + 4 mas el offset x 4
     .res(branch_offset) // This will be the new PC value if a branch is taken
 );
 
@@ -44,9 +45,24 @@ ROM instruction_memory(
     .ins(instruction)
 );
 
+// Jump
+
+wire [31:0] jump_shift_in; // entrada
+assign jump_shift_in = {6'b0,instruction[25:0]}; //entrada concatenada para completar los 32 bits
+wire [31:0] jump_shift_out; //salida
+
+//instancia para desplazar 2 bits de jump para la concatenacion con pc 
+ShiftLeft Jump_shift(
+    .input32(jump_shift_in),
+    .output32Shift2(jump_shift_out)
+);
+
+//une los 4 bits de pc con los 28 bits ya desplazados
+wire [31:0] jump_address; 
+assign jump_address = {pc_incremented[31:28], jump_shift_out[27:0]};
 
 // Control Unit
-wire regDst, aluSrc, memToReg, regWrite, memRead, memWrite, branch, extOp;
+wire regDst, aluSrc, memToReg, regWrite, memRead, memWrite, branch, extOp, jump;
 wire [2:0] aluOp;
 
 CONTROL_UNIT control_unit(
@@ -59,7 +75,8 @@ CONTROL_UNIT control_unit(
     .MemWrite(memWrite),
     .ALUSrc(aluSrc),
     .RegWrite(regWrite),
-    .ExtOp(extOp)
+    .ExtOp(extOp),
+    .Jump(jump)
 );
 
 
@@ -100,6 +117,13 @@ SIGN_EXT sign_extend(
     .bin32(sign_ext)
 );
 
+// Branch: offset x 4
+
+ShiftLeft branch_shift (
+    .input32(sign_ext), //offset ya extendido a 32 bits con signo
+    .output32Shift2(branch_shift_out) //offset x4 que entrara en el branch
+);
+
 // ALU Control Unit
 wire [3:0] alu_control_signal;
 
@@ -138,10 +162,23 @@ ALU alu(
 wire branch_AND;
 assign branch_AND = branch & alu_zero_flag;
 
+//salida para conectar pc mux a jump mux 
+wire [31:0] branch_or_next;
+
+
 MUX pc_mux(
     .sel(branch_AND),
     .A(pc_incremented),
     .B(branch_offset),
+    .S(branch_or_next) //modifique su salida a un nuevo mux para determinar si se ejecuta el salto
+);
+
+
+
+MUX jump_mux(
+    .sel(jump), //verifica si la instruccion es de tipo j
+    .A(branch_or_next), //si es 0 sigue su trayecto
+    .B(jump_address), // direccion del salto si es 1 
     .S(pc_in)
 );
 
@@ -163,5 +200,7 @@ MUX write_data_mux(
     .B(mem_read_data), // TODO: Connect to data read from memory
     .S(write_back_data)
 );
+
+
 
 endmodule
