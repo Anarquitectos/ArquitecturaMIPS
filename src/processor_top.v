@@ -28,10 +28,11 @@ ADDER pc_adder(
 
 // Adder to calculate the branch offset
 wire [31:0] branch_offset; // This will hold the branch offset value
+wire [31:0] branch_shift_out; //offset del branch ya multiplicado por 4
 
 ADDER branch_adder(
     .A(pc_incremented),
-    .B(32'd0), // TODO: Implement branch offset calculation
+    .B(branch_shift_out), // PC + 4 mas el offset x 4
     .res(branch_offset) // This will be the new PC value if a branch is taken
 );
 
@@ -114,6 +115,13 @@ SIGN_EXT sign_extend(
     .bin16(instruction[15:0]), // Los 16 bits de la instruccion
     .opExt(extOp), // 1 = signo, 0 = ceros
     .bin32(sign_ext)
+);
+
+// Branch: offset x 4
+
+ShiftLeft branch_shift (
+    .input32(sign_ext), //offset ya extendido a 32 bits con signo
+    .output32Shift2(branch_shift_out) //offset x4 que entrara en el branch
 );
 
 // ALU Control Unit
