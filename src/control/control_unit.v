@@ -26,7 +26,8 @@ always @* begin
     ExtOp     = 1;
     Jump      = 0;
     case(opcode)
-        6'b000000: begin        // R-type instructions
+        //? Instrucciones Tipo R
+        6'b000000: begin        
             RegDst   <= 1;
             ALUSrc   <= 0;
             MemtoReg <= 0;
@@ -34,9 +35,10 @@ always @* begin
             MemRead  <= 0;
             MemWrite <= 0;
             Branch   <= 0;
-            ALUOp    <= 3'b10;  // R-type ALU operation
+            ALUOp    <= 3'b10;  // Operacion de tipo R en ALU (determinado por funct)
         end
-        6'b100011: begin        // lw instruction
+        //? Instruccion LW (Load Word)
+        6'b100011: begin        
             RegDst   <= 0;
             ALUSrc   <= 1;
             MemtoReg <= 1;
@@ -44,29 +46,81 @@ always @* begin
             MemRead  <= 1;
             MemWrite <= 0;
             Branch   <= 0;
-            ALUOp    <= 3'b00;  // lw ALU operation (add)
+            ALUOp    <= 3'b00;  // Operacion de LW en ALU (ADD)
         end
-        6'b101011: begin        // sw instruction
-            RegDst   <= 'bx;    // not relevant
+        //? Instruccion SW (Store Word)
+        6'b101011: begin        
+            RegDst   <= 'bx;    // sin relevancia, no se escribe en banco de registros
             ALUSrc   <= 1;
-            MemtoReg <= 'bx;    // not relevant
+            MemtoReg <= 'bx;    // sin relevancia, no se escribe en banco de registros
             RegWrite <= 0;
             MemRead  <= 0;
             MemWrite <= 1;
             Branch   <= 0;
-            ALUOp    <= 3'b00;  // sw ALU operation (add)
+            ALUOp    <= 3'b00;  // Operacion de SW en ALU (ADD)
         end
-        6'b000100: begin        // branch instruction
-            RegDst   <= 'bx;    // not relevant
+        //? BEQ BRANCH instruction
+        6'b000100: begin        
+            RegDst   <= 'bx;    // sin relevancia, no se escribe en banco de registros
             ALUSrc   <= 0;
-            MemtoReg <= 'bx;    // not relevant
+            MemtoReg <= 'bx;    // sin relevancia, no se escribe en banco de registros
             RegWrite <= 0;
             MemRead  <= 0;
             MemWrite <= 0;
-            Branch   <= 1;      // enable branch
-            ALUOp    <= 3'b01;  // beq ALU operation (sub)
+            Branch   <= 1;      // habilitar branch
+            ALUOp    <= 3'b01;  // Operacion de BEQ en ALU (SUB)
         end
-        default: begin          // default case for unsupported opcodes
+        //? Instrucciones tipo I
+        6'b001000,              // para addi
+        6'b001001: begin        // para addiu
+            // GPR[rt] <= GPR[rs] + immediate (para addi y addiu)
+            ALUSrc = 1; 
+            RegWrite = 1;       // lo va a guardar en rt
+            ALUOp = 3'b000; 
+            ExtOp = 1; 
+        end
+        6'b001010: begin        // slti, compara rs con inmediato
+            // GPR[rt] <= (GPR[rs] < sign_extend(immediate) )
+            ALUSrc = 1;         // para que pase el inmediato y no rt
+            RegWrite = 1;       // lo va a guardar en rt
+            ALUOp = 3'b011;     // slti
+            ExtOp = 1; 
+        end
+        6'b001100: begin 
+            // GPR[rt] <= GPR[rs] and zero_extend(immediate)
+            ALUSrc = 1;         // para que pase el inmediato
+            RegWrite = 1; 
+            ALUOp = 3'b100; 
+            ExtOp = 0; 
+        end
+        6'b001101: begin        // or con el inmediato extendido con CEROS
+            // GPR[rt] <= GPR[rs] or zero_extend(immediate)
+            ALUSrc = 1; 
+            RegWrite = 1; 
+            ALUOp = 3'b101; 
+            ExtOp = 0; 
+        end
+        6'b001110: begin        // XORI: XOR con el inmediato extendido con CEROS
+            // GPR[rt] <= GPR[rs] xor zero_extend(immediate)
+            ALUSrc = 1;         // para que pase el inmediato
+            RegWrite = 1; 
+            ALUOp = 3'b110;     // xor
+            ExtOp = 0; 
+        end
+        6'b001111: begin        // LUI: carga el inmediato en los 16 bits altos
+            // GPR[rt] <= immediate || 0^16
+            ALUSrc = 1;         // para que pase el inmediato
+            RegWrite = 1; 
+            ALUOp = 3'b111; 
+            ExtOp = 0; 
+        end
+        //? Instrucciones tipo J
+        6'b000010: begin
+           Jump = 1;            // no se necesita regWrite ni memWrite y tampoco activar el branch 
+        end   
+
+        //* Caso por defecto, no se realiza ninguna operación
+        default: begin          
             RegDst   <= 0;
             ALUSrc   <= 0;
             MemtoReg <= 0;
@@ -76,59 +130,6 @@ always @* begin
             Branch   <= 0;
             ALUOp    <= 3'b00;  // default ALU operation (add)
         end
-    // para tipo I 
-        6'b001000,          // para addi
-        6'b001001: begin    // para addiu
-        // GPR[rt] <= GPR[rs] + immediate (para addi y addiu)
-            ALUSrc = 1; 
-            RegWrite = 1; // lo va a guardar en rt
-            ALUOp = 3'b000; 
-            ExtOp = 1; 
-        end
-        6'b001010: begin  // slti, compara rs con inmediato
-        // GPR[rt] <= (GPR[rs] < sign_extend(immediate) )
-            ALUSrc = 1; // para que pase el inmediato y no rt
-            RegWrite = 1;  // lo va a guardar en rt
-            ALUOp = 3'b011; // slti
-            ExtOp = 1; 
-        end
-        6'b001100: begin 
-        // GPR[rt] <= GPR[rs] and zero_extend(immediate)
-            ALUSrc = 1; // para que pase el inmediato
-            RegWrite = 1; 
-            ALUOp = 3'b100; 
-            ExtOp = 0; 
-        end
-        6'b001101: begin // or con el inmediato extendido con CEROS
-        // GPR[rt] <= GPR[rs] or zero_extend(immediate)
-            ALUSrc = 1; 
-            RegWrite = 1; 
-            ALUOp = 3'b101; 
-            ExtOp = 0; 
-        end
-
-        // xori: XOR con el inmediato extendido con CEROS
-        6'b001110: begin 
-        // GPR[rt] <= GPR[rs] xor zero_extend(immediate)
-            ALUSrc = 1; // para que pase el inmediato
-            RegWrite = 1; 
-            ALUOp = 3'b110; // xor
-            ExtOp = 0; 
-        end
-
-        // lui: carga el inmediato en los 16 bits altos
-        6'b001111: begin 
-        //GPR[rt] <= immediate || 0^16
-            ALUSrc = 1; // para que pase el inmediato
-            RegWrite = 1; 
-            ALUOp = 3'b111; 
-            ExtOp = 0; 
-        end
-
-    // tipo J
-        6'b000010: begin
-           Jump = 1; //no se necesita regWrite ni memWrite y tampoco activar el branch 
-        end   
 
     endcase
 end

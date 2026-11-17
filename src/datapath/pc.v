@@ -7,9 +7,9 @@ module PC(
 
     always @(posedge clk or posedge reset) begin
         if (reset) begin
-            currentPC <= 32'b0; // Reset to 0
+            currentPC <= 32'b0; // Reset en 0
         end else begin
-            currentPC <= nextPC; // Update PC with nextPC
+            currentPC <= nextPC; // Actualiza el PC con la siguiente dirección
         end
     end
 

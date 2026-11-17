@@ -6,19 +6,19 @@ module ALU_CONTROL(
 
 always @* begin
     case(ALUOp)
-        3'b00: ALUctl <= 4'b0010; // add for lw/sw
-        3'b01: ALUctl <= 4'b0110; // sub for branch
-        3'b10: begin // R-type instructions: listen to funct field 
+        3'b00: ALUctl <= 4'b0010; // ADD para LW/SW
+        3'b01: ALUctl <= 4'b0110; // SUB para branches
+        3'b10: begin // Instrucciones tipo R: especificado por el campo funct
             case(funct)
-                6'b100000: ALUctl <= 4'b0010; // add
-                6'b100001: ALUctl = 4'b0010; // addu
-                6'b100010: ALUctl <= 4'b0110; // sub
-                6'b100011: ALUctl = 4'b0110; // subu
-                6'b100100: ALUctl <= 4'b0000; // and
-                6'b100101: ALUctl <= 4'b0001; // or
-                6'b101010: ALUctl <= 4'b0111; // slt
-                6'b100110: ALUctl = 4'b0011; // xor
-                6'b100111: ALUctl = 4'b1100; // nor
+                6'b100000: ALUctl <= 4'b0010;   // add
+                6'b100001: ALUctl = 4'b0010;    // addu
+                6'b100010: ALUctl <= 4'b0110;   // sub
+                6'b100011: ALUctl = 4'b0110;    // subu
+                6'b100100: ALUctl <= 4'b0000;   // and
+                6'b100101: ALUctl <= 4'b0001;   // or
+                6'b101010: ALUctl <= 4'b0111;   // slt
+                6'b100110: ALUctl = 4'b0011;    // xor
+                6'b100111: ALUctl = 4'b1100;    // nor
                 default:   ALUctl <= 4'b0000;
             endcase
         end
