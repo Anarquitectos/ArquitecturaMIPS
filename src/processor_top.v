@@ -1,7 +1,14 @@
 module PROCESSOR_MIPS
 (
     input clk,
-    input reset
+    input reset,
+
+    //* DEBUG en la DE10-Lite
+    input [4:0] debug_reg_addr,
+    output [31:0] debug_pc,
+    output [31:0] debug_inst,
+    output [31:0] debug_alu,
+    output [31:0] debug_reg_data
 );
 
 // Contador de programa (PC)
@@ -104,9 +111,11 @@ REG_BANK register_bank(
     .ReadReg2(instruction[20:16]),  // rt
     .WrReg(write_reg),              // destino elegido
     .WrData(write_back_data),       // dato final de la alu o ram
-    .regWrite(regWrite),            // tal vez poner & ~ reset, para que no escriba cuando haya reset, pero no se
+    .regWrite(regWrite & ~reset),   //? protege contra escritura cuando hay reset
     .ReadData1(read_data1),
-    .ReadData2(read_data2)
+    .ReadData2(read_data2),
+    .DebugReg(debug_reg_addr),
+    .DebugData(debug_reg_data)
 );
 
 // Inmediato de 16 bits -> 32 bits Sign Extend
@@ -190,7 +199,7 @@ wire [31:0] mem_read_data; // dato leido de la ram
 RAM data_memory(
     .clk(clk),
     .DirL(alu_result[7:2]), // direccion en bytes / 4 = indice de palabra
-    .we(memWrite),          // tal vez poner & ~ reset, para que no escriba cuando haya reset, pero no se
+    .we(memWrite & ~reset), //? protege contra escritura cuando hay reset
     .DataIn(read_data2),    // sw guarda el valor de rt
     .DataOut(mem_read_data)
 );
@@ -203,6 +212,8 @@ MUX write_data_mux(
     .S(write_back_data)
 );
 
-
+assign debug_pc   = pc_out;
+assign debug_inst = instruction;
+assign debug_alu  = alu_result;
 
 endmodule

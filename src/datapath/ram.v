@@ -3,17 +3,17 @@ module RAM (
 	input [5:0]DirL,
 	input we, // si es 1, puede escribir
 	input [31:0]DataIn,
-	output reg[31:0]DataOut
+	output [31:0]DataOut
 );
 
 reg [31:0]mem[0:63];
 
+assign DataOut = mem[DirL]; 
 
-always @* begin
+always @(posedge clk) begin
 	if(we) begin
-		mem[DirL]=DataIn;
+		mem[DirL] <= DataIn;
 	end
-	assign DataOut = mem[DirL]; 
 end
 
 initial begin

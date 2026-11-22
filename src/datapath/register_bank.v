@@ -1,34 +1,35 @@
 module REG_BANK (
     input clk,
-    input [4:0] ReadReg1, // rs
-    input [4:0] ReadReg2, // rt
-    input [4:0] WrReg, // rt o rd, donde escribir
-    input [31:0] WrData, // dato a escribir
-    input regWrite, // si es 1 se puede escribir
+    input [4:0] ReadReg1,   // rs
+    input [4:0] ReadReg2,   // rt
+    input [4:0] WrReg,      // rt o rd, donde escribir
+    input [31:0] WrData,    // dato a escribir
+    input regWrite,         // si es 1 se puede escribir
 
-    output reg [31:0] ReadData1, // 
-    output reg [31:0] ReadData2
+    output [31:0] ReadData1,
+    output [31:0] ReadData2,
+
+    // Puertos extras para inspeccionar registros en los displays de la DE10-Lite
+    input [4:0] DebugReg,
+    output [31:0] DebugData
 );
 
 reg [31:0] mem [0:31];
 
 initial begin
-	$readmemb("registersData.txt", mem);
+    $readmemb("registersData.txt", mem);
 end
 
-always @* // en flanco de subida
-begin
-    // si lo pongo dentro del always hay problema de retraso con la instruccion tipo I
-    assign ReadData1 = mem[ReadReg1];
-    assign ReadData2 = mem[ReadReg2];
+// Lectura combinacional (R0 siempre es 0)
+assign ReadData1 = (ReadReg1 == 5'd0) ? 32'd0 : mem[ReadReg1];
+assign ReadData2 = (ReadReg2 == 5'd0) ? 32'd0 : mem[ReadReg2];
+assign DebugData = (DebugReg == 5'd0) ? 32'd0 : mem[DebugReg];
 
-end
-
-always @* begin
-    if(regWrite && WrReg != 5'd0) begin
-        mem[WrReg] = WrData;
+// Escritura síncrona en flanco de subida del reloj
+always @(posedge clk) begin
+    if (regWrite && WrReg != 5'd0) begin
+        mem[WrReg] <= WrData;
     end
 end
 
 endmodule
-
