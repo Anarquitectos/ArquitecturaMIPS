@@ -1,5 +1,5 @@
-module REG_BANK ( // lectura combinacional, pero escritura sincrona clk
-    input clk, // reloj
+module REG_BANK (
+    input clk,
     input [4:0] ReadReg1, // rs
     input [4:0] ReadReg2, // rt
     input [4:0] WrReg, // rt o rd, donde escribir
@@ -16,14 +16,17 @@ initial begin
 	$readmemb("registersData.txt", mem);
 end
 
-// si lo pongo dentro del always hay problema de retraso con la instruccion tipo I
-assign ReadData1 = mem[ReadReg1];
-assign ReadData2 = mem[ReadReg2];
-
-always @(posedge clk) // en flanco de subida
+always @* // en flanco de subida
 begin
-    if(regWrite && WrReg != 5'd0) begin // tmb checa que el destino no sea el registro 0
-        mem[WrReg] <= WrData;
+    // si lo pongo dentro del always hay problema de retraso con la instruccion tipo I
+    assign ReadData1 = mem[ReadReg1];
+    assign ReadData2 = mem[ReadReg2];
+
+end
+
+always @* begin
+    if(regWrite && WrReg != 5'd0) begin
+        mem[WrReg] = WrData;
     end
 end
 

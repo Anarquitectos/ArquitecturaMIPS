@@ -35,3 +35,35 @@ Para abrir las señales de la ALU en el Wave de ModelSim:
 vsim -lib work type_r_monocycle_tb
 do {tb\type_r_wave.do}
 ```
+
+## Prueba completa de instrucciones
+
+El banco de pruebas `tb/all_instructions_tb.v` prueba las instrucciones
+implementadas: todas las operaciones tipo R (ADD, ADDU, SUB, SUBU, AND, OR,
+XOR, NOR y SLT), las operaciones tipo I disponibles (ADDI, ADDIU, SLTI,
+ANDI, ORI, XORI y LUI), BEQ, J, LW y SW.
+
+El programa de prueba se carga desde
+`instrucciones_completas.txt`. El testbench inicializa los registros y la RAM
+antes de ejecutar el programa. Para ejecutar la prueba desde el directorio
+raiz del proyecto:
+
+```text
+vlib work
+vlog -work work src\datapath\adder.v src\datapath\alu.v src\datapath\mux.v src\datapath\pc.v src\datapath\ram.v src\datapath\register_bank.v src\datapath\rom.v src\datapath\shiftLeft.v src\datapath\signExt.v src\control\alu_control.v src\control\control_unit.v src\processor_top.v tb\all_instructions_tb.v
+vsim -c -lib work all_instructions_tb -do "run -all; quit -f"
+```
+
+La salida de consola muestra el estado de cada ciclo y una linea `PASS` o
+`FAIL` por verificacion. Tambien se imprime el resumen final
+`PASS: todas las instrucciones implementadas fueron probadas.` cuando no hay
+errores.
+
+Para visualizar las instrucciones y los datos internos en el Wave de
+ModelSim:
+
+```text
+vsim -lib work all_instructions_tb
+do {tb\all_instructions_wave.do}
+run 320 ns
+```

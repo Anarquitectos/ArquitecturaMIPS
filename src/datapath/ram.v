@@ -1,4 +1,4 @@
-module RAM ( // sincrona
+module RAM (
 	input clk,
 	input [5:0]DirL,
 	input we, // si es 1, puede escribir
@@ -8,15 +8,12 @@ module RAM ( // sincrona
 
 reg [31:0]mem[0:63];
 
-// escritura combinacional, cada que cambia, modifica
-assign DataOut = mem[DirL]; 
 
-always @(posedge clk)
-begin
-	if(we)
-	begin // escribir
-		mem[DirL]<=DataIn;
+always @* begin
+	if(we) begin
+		mem[DirL]=DataIn;
 	end
+	assign DataOut = mem[DirL]; 
 end
 
 initial begin
