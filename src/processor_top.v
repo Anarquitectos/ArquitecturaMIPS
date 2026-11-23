@@ -107,6 +107,7 @@ wire [31:0] write_back_data;
 
 REG_BANK register_bank(
     .clk(clk),
+    .reset(reset),
     .ReadReg1(instruction[25:21]),  // rs
     .ReadReg2(instruction[20:16]),  // rt
     .WrReg(write_reg),              // destino elegido
@@ -198,6 +199,7 @@ wire [31:0] mem_read_data; // dato leido de la ram
 
 RAM data_memory(
     .clk(clk),
+    .reset(reset),
     .DirL(alu_result[7:2]), // direccion en bytes / 4 = indice de palabra
     .we(memWrite & ~reset), //? protege contra escritura cuando hay reset
     .DataIn(read_data2),    // sw guarda el valor de rt

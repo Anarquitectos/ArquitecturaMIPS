@@ -1,5 +1,6 @@
 module REG_BANK (
     input clk,
+    input reset,
     input [4:0] ReadReg1,   // rs
     input [4:0] ReadReg2,   // rt
     input [4:0] WrReg,      // rt o rd, donde escribir
@@ -15,6 +16,7 @@ module REG_BANK (
 );
 
 reg [31:0] mem [0:31];
+integer k;
 
 initial begin
     $readmemb("registersData.txt", mem);
@@ -27,9 +29,12 @@ assign DebugData = (DebugReg == 5'd0) ? 32'd0 : mem[DebugReg];
 
 // Escritura síncrona en flanco de subida del reloj
 always @(posedge clk) begin
-    if (regWrite && WrReg != 5'd0) begin
-        mem[WrReg] <= WrData;
-    end
+    if (reset) begin
+            for (k = 1; k < 32; k = k + 1)
+                mem[k] <= 32'd0;
+        end else if (regWrite && WrReg != 5'd0) begin
+            mem[WrReg] <= WrData;
+        end
 end
 
 endmodule

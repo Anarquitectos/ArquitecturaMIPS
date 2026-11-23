@@ -1,4 +1,5 @@
 module de10_lite_top (
+    input        MAX10_CLK1_50, // Reloj interno de 50 MHz de la DE10-Lite (PIN_P11)
     input  [9:0] SW,
     output [9:0] LEDR,
     output [6:0] HEX0,
@@ -8,15 +9,30 @@ module de10_lite_top (
     output [6:0] HEX4,
     output [6:0] HEX5
 );
-    wire clk_manual = SW[0];   // Switch 0 = Reloj manual (cada subida 0->1 ejecuta 1 ciclo)
-    wire reset      = SW[9];   // Switch 9 = Reset (1 = reinicia PC a 0)
+    wire reset          = SW[9];   // Switch 9 = Reset (1 = reinicia PC y Registros a 0)
     wire [2:0] view_sel = SW[3:1]; // Switches 3..1 = Qué señal ver en los displays
     wire [4:0] reg_sel  = SW[8:4]; // Switches 8..4 = Qué registro (R0-R31) inspeccionar
+
+    // Filtro antirrebote (20 ms a 50 MHz) para que SW[0] genere un pulso limpio por movimiento
+    reg [19:0] db_cnt = 20'd0;
+    reg clk_clean = 1'b0;
+
+    always @(posedge MAX10_CLK1_50) begin
+        if (SW[0] != clk_clean) begin
+            db_cnt <= db_cnt + 20'd1;
+            if (db_cnt == 20'd1_000_000) begin
+                clk_clean <= SW[0];
+                db_cnt <= 20'd0;
+            end
+        end else begin
+            db_cnt <= 20'd0;
+        end
+    end
 
     wire [31:0] pc_val, inst_val, alu_val, reg_val;
 
     PROCESSOR_MIPS cpu (
-        .clk(clk_manual),
+        .clk(clk_clean),           // Se conecta el reloj filtrado en lugar de SW[0] directo
         .reset(reset),
         .debug_reg_addr(reg_sel),
         .debug_pc(pc_val),
@@ -25,9 +41,9 @@ module de10_lite_top (
         .debug_reg_data(reg_val)
     );
 
-    // LEDs superiores muestran el estado del reloj, reset y el PC actual en binario
+    // LEDs superiores muestran el estado del reset, reloj limpio y el PC actual en binario
     assign LEDR[9]   = reset;
-    assign LEDR[8]   = clk_manual;
+    assign LEDR[8]   = clk_clean;
     assign LEDR[7:0] = pc_val[7:0];
 
     // Multiplexor para elegir qué mostrar en los 6 displays HEX (24 bits = 6 dígitos hex)
