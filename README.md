@@ -67,3 +67,33 @@ vsim -lib work all_instructions_tb
 do {tb\all_instructions_wave.do}
 run 320 ns
 ```
+
+## Prueba del pipeline de cinco etapas
+
+`tb/pipeline_full_tb.v` carga un programa autocontenido en la ROM de la
+simulacion y verifica las nueve operaciones tipo R, las siete tipo I, `LW`,
+`SW`, `BEQ` tomado/no tomado y `J`. Comprueba resultados del banco de registros
+y RAM, instrucciones que deben omitirse, y cuenta ciclos donde hay trabajo
+simultaneo en IF, ID, EX, MEM y WB.
+
+Ejecutar desde la raiz con ModelSim:
+
+```text
+vlib work
+vlog -work work src\datapath\adder.v src\datapath\alu.v src\datapath\mux.v src\datapath\pc.v src\datapath\ram.v src\datapath\register_bank.v src\datapath\rom.v src\datapath\shiftLeft.v src\datapath\signExt.v src\control\alu_control.v src\control\control_unit.v src\pipeline\if_id.v src\pipeline\id_ex.v src\pipeline\ex_mem.v src\pipeline\mem_wb.v src\processor_top.v tb\pipeline_full_tb.v
+vsim -c -lib work pipeline_full_tb -do "run -all;"
+```
+
+La prueba evita dependencias entre instrucciones consecutivas: el procesador
+actual no implementa forwarding ni interlocks/stalls, por lo que un consumidor
+puede leer un valor antiguo antes de que su productor llegue a WB. En codigo
+real, hay que insertar instrucciones independientes/NOPs o agregar forwarding
+y una unidad de deteccion de hazards; `LW` seguido de una instruccion que use
+su destino necesita especial atencion.
+
+Los saltos tambien requieren cuidado: `BEQ` se resuelve en MEM y no se anulan
+las instrucciones que ya entraron al pipeline; en esta implementacion se
+ejecutan tres instrucciones posteriores como delay slots. `J` se selecciona
+desde ID y deja una instruccion posterior en vuelo. La prueba coloca
+instrucciones deliberadas en esos slots y verifica que las siguientes del
+camino secuencial se omitan.
