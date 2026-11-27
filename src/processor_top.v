@@ -5,10 +5,12 @@ module PROCESSOR_MIPS
 
     //* DEBUG en la DE10-Lite
     input [4:0] debug_reg_addr,
+    input [5:0] debug_mem_addr,
     output [31:0] debug_pc,
     output [31:0] debug_inst,
     output [31:0] debug_alu,
-    output [31:0] debug_reg_data
+    output [31:0] debug_reg_data,
+    output [31:0] debug_mem_data
 );
 
 // Contador de programa (PC)
@@ -321,7 +323,9 @@ RAM data_memory(
     .DirL(alu_result_MEM[7:2]), // direccion en bytes / 4 = indice de palabra
     .we(memWrite_MEM & ~reset), //? protege contra escritura cuando hay reset
     .DataIn(write_data_MEM),    // sw guarda el valor de rt
-    .DataOut(mem_read_data)
+    .DataOut(mem_read_data),
+    .DebugAddr(debug_mem_addr),
+    .DebugData(debug_mem_data)
 );
 
 // Cables de salida del buffer MEM/WB

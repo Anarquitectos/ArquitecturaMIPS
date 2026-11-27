@@ -4,13 +4,16 @@ module RAM (
 	input [5:0]DirL,
 	input we, // si es 1, puede escribir
 	input [31:0]DataIn,
-	output [31:0]DataOut
+	output [31:0]DataOut,
+	input [5:0]DebugAddr,
+	output [31:0]DebugData
 );
 
 reg [31:0]mem[0:63];
 integer k;
 
 assign DataOut = mem[DirL]; 
+assign DebugData = mem[DebugAddr];
 
 always @(posedge clk or posedge reset) begin
 

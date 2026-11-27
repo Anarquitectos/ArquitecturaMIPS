@@ -23,10 +23,12 @@ module cesar_mips_tb;
         .clk(clk),
         .reset(reset),
         .debug_reg_addr(5'd0),
+        .debug_mem_addr(6'd0),
         .debug_pc(),
         .debug_inst(),
         .debug_alu(),
-        .debug_reg_data()
+        .debug_reg_data(),
+        .debug_mem_data()
     );
 
     initial begin

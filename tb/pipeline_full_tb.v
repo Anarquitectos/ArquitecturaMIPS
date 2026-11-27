@@ -17,10 +17,12 @@ module pipeline_full_tb;
         .clk(clk),
         .reset(reset),
         .debug_reg_addr(debug_reg_addr),
+        .debug_mem_addr(6'd0),
         .debug_pc(debug_pc),
         .debug_inst(debug_inst),
         .debug_alu(debug_alu),
-        .debug_reg_data(debug_reg_data)
+        .debug_reg_data(debug_reg_data),
+        .debug_mem_data()
     );
 
     initial begin
@@ -104,7 +106,7 @@ module pipeline_full_tb;
         reset = 1'b1;
 
         #1;
-        for (i = 0; i < 256; i = i + 1)
+        for (i = 0; i < 1024; i = i + 1)
             dut.instruction_memory.mem[i] = 8'b0;
         for (i = 0; i < 64; i = i + 1)
             dut.data_memory.mem[i] = 32'b0;
@@ -196,8 +198,49 @@ module pipeline_full_tb;
                      overlap_cycles);
         end
 
+        reset = 1'b1;
+        for (i = 0; i < 1024; i = i + 1)
+            dut.instruction_memory.mem[i] = 8'b0;
+
+        // Verify RAW padding, BEQ/J delay slots, and J-target loop padding.
+        load_instruction(0,  i_type(6'b001000, 5'd0, 5'd1, 16'd5));
+        load_instruction(1,  32'd0);
+        load_instruction(2,  32'd0);
+        load_instruction(3,  32'd0);
+        load_instruction(4,  i_type(6'b001000, 5'd1, 5'd2, 16'd1));
+        load_instruction(5,  32'd0);
+        load_instruction(6,  32'd0);
+        load_instruction(7,  32'd0);
+        load_instruction(8,  i_type(6'b000100, 5'd1, 5'd1, 16'd4));
+        load_instruction(9,  32'd0);
+        load_instruction(10, 32'd0);
+        load_instruction(11, 32'd0);
+        load_instruction(12, i_type(6'b001000, 5'd0, 5'd5, 16'd99));
+        load_instruction(13, i_type(6'b001000, 5'd2, 5'd3, 16'd1));
+        load_instruction(14, j_type(26'd18));
+        load_instruction(15, 32'd0);
+        load_instruction(16, i_type(6'b001000, 5'd0, 5'd6, 16'd99));
+        load_instruction(17, 32'd0);
+        load_instruction(18, 32'd0);
+        load_instruction(19, 32'd0);
+        load_instruction(20, 32'd0);
+        load_instruction(21, i_type(6'b001000, 5'd3, 5'd4, 16'd1));
+        load_instruction(22, j_type(26'd22));
+
+        repeat (2) @(posedge clk);
+        #1 reset = 1'b0;
+        repeat (35) @(posedge clk);
+        #2;
+
+        check_register(5'd1, 32'd5, "RAW producer");
+        check_register(5'd2, 32'd6, "RAW consumer");
+        check_register(5'd3, 32'd7, "BEQ target");
+        check_register(5'd4, 32'd8, "J target");
+        check_register(5'd5, 32'd0, "BEQ flush path");
+        check_register(5'd6, 32'd0, "J flush path");
+
         if (errors == 0)
-            $display("PASS: todas las instrucciones y el pipeline fueron verificados.");
+            $display("PASS: instrucciones, hazards de datos, saltos y pipeline verificados.");
         else
             $display("FAIL: %0d verificaciones fallaron.", errors);
         $finish;

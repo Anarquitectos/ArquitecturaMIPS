@@ -6,7 +6,12 @@ module jump_branch_tb;
     integer errors;
     integer i;
 
-    PROCESSOR_MIPS dut (.clk(clk), .reset(reset));
+    PROCESSOR_MIPS dut (
+        .clk(clk),
+        .reset(reset),
+        .debug_mem_addr(6'd0),
+        .debug_mem_data()
+    );
 
     initial begin
         clk = 1'b0;

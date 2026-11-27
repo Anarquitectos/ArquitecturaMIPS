@@ -8,7 +8,9 @@ module type_r_monocycle_tb;
 
     PROCESSOR_MIPS dut (
         .clk(clk),
-        .reset(reset)
+        .reset(reset),
+        .debug_mem_addr(6'd0),
+        .debug_mem_data()
     );
 
     initial begin

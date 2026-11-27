@@ -7,7 +7,7 @@ para el microprocesador monociclo de la FPGA DE10-Lite.
 
 Se conserva el funcionamiento del programa original:
 - Maximo 17 caracteres.
-- Maximo 64 instrucciones.
+- Maximo 256 instrucciones (capacidad de la ROM de instrucciones).
 - Una palabra de RAM por caracter.
 - Resultado en RAM desde la direccion 72.
 - Archivo instrucciones.txt con bytes en orden little-endian.
@@ -20,8 +20,9 @@ import sys
 # 1. CONFIGURACION
 
 MAX_CHARS = 17
-MAX_INSTR = 64
+MAX_INSTR = 256
 OUT_OFFSET = 72
+COMPLETION_MARKER = 0x5A5A
 
 # ------------------------------------------------------------
 # CAMBIAR AQUI EL NOMBRE DEL ARCHIVO DE SALIDA:
@@ -69,6 +70,13 @@ I_OP = {
 
 # Opcode para instrucciones tipo J.
 J_OP = {"j": 0x02}
+
+# Numero de instrucciones independientes necesarias entre una escritura y
+# la siguiente lectura del registro en el pipeline sin forwarding.
+NOP_HAZARD_COUNT = 3
+BRANCH_DELAY_SLOTS = 3
+JUMP_DELAY_SLOTS = 1
+JUMP_TARGET_GUARD_NOPS = 3
 
 # 2. GENERACION DEL PROGRAMA MIPS
 
@@ -168,12 +176,99 @@ def generar_asm(frase, clave, modo):
 
     instrucciones += [
         "j     ciclo",
-        "fin: j  fin                     # detener el programa",
+        f"fin: addi $t9, $zero, {COMPLETION_MARKER}  # marca de programa terminado",
+        "sw   $t9, 252($zero)           # RAM[63] indica que el resultado esta listo",
+        "detener: j detener             # detener el programa",
     ]
 
     return instrucciones
 
 # 3. ENSAMBLADOR: MIPS A CODIGO MAQUINA
+
+def registros_usados(linea):
+    """Regresa los registros leidos y escritos por una instruccion."""
+    partes = linea.replace(",", " ").split()
+    mnemonico = partes[0]
+    operandos = partes[1:]
+
+    if mnemonico in R_FUNCT:
+        return operandos[1:3], operandos[0]
+
+    if mnemonico == "lui":
+        return [], operandos[0]
+
+    if mnemonico in ("lw", "sw"):
+        registro_base = operandos[1].rstrip(")").split("(")[1]
+        if mnemonico == "lw":
+            return [registro_base], operandos[0]
+        return [operandos[0], registro_base], None
+
+    if mnemonico == "beq":
+        return operandos[0:2], None
+
+    if mnemonico in I_OP:
+        return [operandos[1]], operandos[0]
+
+    if mnemonico in J_OP or mnemonico == "nop":
+        return [], None
+
+    raise ValueError(f"Instruccion no soportada: {linea}")
+
+
+def insertar_nops_hazards(instrucciones, etiquetas_originales):
+    """Inserta NOPs de datos y control, y ajusta las direcciones de etiquetas."""
+    instrucciones_ajustadas = []
+    indice_ajustado = []
+    ultima_escritura = {}
+    destinos_jump = {
+        etiquetas_originales[linea.split()[1]]
+        for linea in instrucciones
+        if linea.split()[0] in J_OP
+    }
+
+    for indice, linea in enumerate(instrucciones):
+        indice_ajustado.append(len(instrucciones_ajustadas))
+        if indice in destinos_jump:
+            instrucciones_ajustadas.extend(
+                ["nop"] * JUMP_TARGET_GUARD_NOPS
+            )
+
+        registros_leidos, registro_escrito = registros_usados(linea)
+        nops_necesarios = 0
+
+        for registro in registros_leidos:
+            if registro == "$zero" or registro not in ultima_escritura:
+                continue
+
+            instrucciones_intermedias = (
+                len(instrucciones_ajustadas) - ultima_escritura[registro] - 1
+            )
+            nops_necesarios = max(
+                nops_necesarios,
+                NOP_HAZARD_COUNT - instrucciones_intermedias
+            )
+
+        instrucciones_ajustadas.extend(
+            ["nop"] * max(0, nops_necesarios)
+        )
+        instrucciones_ajustadas.append(linea)
+
+        if registro_escrito and registro_escrito != "$zero":
+            ultima_escritura[registro_escrito] = len(instrucciones_ajustadas) - 1
+
+        mnemonico = linea.split()[0]
+        if mnemonico == "beq":
+            instrucciones_ajustadas.extend(["nop"] * BRANCH_DELAY_SLOTS)
+        elif mnemonico in J_OP:
+            instrucciones_ajustadas.extend(["nop"] * JUMP_DELAY_SLOTS)
+
+    indice_ajustado.append(len(instrucciones_ajustadas))
+    etiquetas_ajustadas = {
+        etiqueta: indice_ajustado[indice]
+        for etiqueta, indice in etiquetas_originales.items()
+    }
+
+    return instrucciones_ajustadas, etiquetas_ajustadas
 
 def ensamblar(lineas):
     """
@@ -184,7 +279,7 @@ def ensamblar(lineas):
     """
 
     instrucciones_limpias = []
-    etiquetas = {}
+    etiquetas_originales = {}
 
     # --------------------------------------------------------
     # Primera pasada: quitar comentarios y registrar etiquetas.
@@ -197,11 +292,15 @@ def ensamblar(lineas):
 
         while ":" in linea:
             etiqueta, linea = linea.split(":", 1)
-            etiquetas[etiqueta.strip()] = len(instrucciones_limpias)
+            etiquetas_originales[etiqueta.strip()] = len(instrucciones_limpias)
             linea = linea.strip()
 
         if linea:
             instrucciones_limpias.append(linea)
+
+    instrucciones_limpias, etiquetas = insertar_nops_hazards(
+        instrucciones_limpias, etiquetas_originales
+    )
 
     # --------------------------------------------------------
     # Segunda pasada: convertir cada instruccion a 32 bits.
@@ -216,8 +315,12 @@ def ensamblar(lineas):
         else:
             operandos = []
 
+        # NOP: SLL $zero, $zero, 0 (codificacion MIPS canonica).
+        if mnemonico == "nop":
+            palabra = 0
+
         # Instrucciones tipo R: add, sub, and, or, etc.
-        if mnemonico in R_FUNCT:
+        elif mnemonico in R_FUNCT:
             rd, rs, rt = (REGS[op] for op in operandos)
 
             palabra = (
@@ -297,6 +400,7 @@ def simular(palabras, max_pasos=5000):
     ram = [0] * 64
     pc = 0
     mascara_32 = 0xFFFFFFFF
+    estados_vistos = set()
 
     # Convertir un numero de 32 bits a entero con signo.
     def con_signo_32(numero):
@@ -311,6 +415,11 @@ def simular(palabras, max_pasos=5000):
         return numero
 
     for _ in range(max_pasos):
+        estado = (pc, tuple(registros), tuple(ram))
+        if estado in estados_vistos:
+            return ram
+        estados_vistos.add(estado)
+
         palabra = palabras[pc // 4]
 
         # Separar los campos de la instruccion.
@@ -325,10 +434,14 @@ def simular(palabras, max_pasos=5000):
         B = registros[rt]
         siguiente_pc = pc + 4
 
+        # NOP: no modifica el estado del procesador.
+        if palabra == 0:
+            pass
+
         # ----------------------------------------------------
         # Tipo R: operaciones entre registros.
         # ----------------------------------------------------
-        if opcode == 0:
+        elif opcode == 0:
             operaciones = {
                 0x20: A + B,                    # add
                 0x21: A + B,                    # addu
@@ -437,16 +550,47 @@ def cesar_py(texto, clave, modo):
 
 def escribir_txt(palabras, ruta):
     """
-    Escribe cada instruccion en cuatro lineas de 8 bits.
+    Escribe cada instruccion en cuatro lineas de 8 bits y completa el archivo
+    hasta tener 1024 lineas.
 
     Se escribe primero el byte menos significativo (little-endian),
     tal como lo necesita la ROM del proyecto.
     """
+    lineas = len(palabras) * 4
+    if lineas > 1024:
+        raise ValueError("El archivo admite como maximo 256 instrucciones.")
+
     with open(ruta, "w", newline="") as archivo:
         for palabra in palabras:
             for byte in range(4):
                 valor_byte = (palabra >> (8 * byte)) & 0xFF
                 archivo.write(f"{valor_byte:08b}\r\n")
+        for _ in range(1024 - lineas -1):
+            archivo.write("00000000\n")
+
+def escribir_mif(palabras, ruta):
+    """Escribe una imagen MIF de bytes para inicializar la ROM en Quartus."""
+    if len(palabras) > MAX_INSTR:
+        raise ValueError(f"La ROM solo admite {MAX_INSTR} instrucciones.")
+
+    datos = [
+        (palabra >> (8 * byte)) & 0xFF
+        for palabra in palabras
+        for byte in range(4)
+    ]
+    datos.extend([0] * (MAX_INSTR * 4 - len(datos)))
+
+    with open(ruta, "w", newline="\n") as archivo:
+        archivo.write(
+            "WIDTH=8;\n"
+            f"DEPTH={MAX_INSTR * 4};\n"
+            "ADDRESS_RADIX=UNS;\n"
+            "DATA_RADIX=BIN;\n"
+            "CONTENT BEGIN\n"
+        )
+        for direccion, valor in enumerate(datos):
+            archivo.write(f"    {direccion} : {valor:08b};\n")
+        archivo.write("END;\n")
 
 def mostrar_datos_entrada(frase):
     """Muestra los codigos ASCII y HEX de cada caracter."""
@@ -536,7 +680,7 @@ def obtener_destinos(salida, copiar_quartus):
     return destinos
 
 def guardar_archivos(palabras, destinos):
-    """Crea las carpetas necesarias y escribe los archivos."""
+    """Crea los archivos de instrucciones de simulacion y sintesis."""
     for destino in destinos:
         ya_existia = os.path.exists(destino)
 
@@ -545,6 +689,14 @@ def guardar_archivos(palabras, destinos):
 
         estado = "Actualizado" if ya_existia else "Creado"
         print(f"{estado}: {destino}  ({len(palabras) * 4} bytes)")
+
+        ruta_mif = os.path.join(
+            os.path.dirname(destino), "instrucciones.mif"
+        )
+        mif_existia = os.path.exists(ruta_mif)
+        escribir_mif(palabras, ruta_mif)
+        estado_mif = "Actualizado" if mif_existia else "Creado"
+        print(f"{estado_mif}: {ruta_mif}")
 
 # 6. PROGRAMA PRINCIPAL
 

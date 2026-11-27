@@ -1,8 +1,8 @@
-module ROM(
+module ROM (
     input  [31:0] insAddress,
     output [31:0] ins
 );
-    reg [7:0] mem [0:255];
+    reg [7:0] mem [0:256*4-1];
 
     // Concatena los 4 bytes de la memoria para formar la instrucción de 32 bits
     // Endianess: Little Endian (least significant byte first)
